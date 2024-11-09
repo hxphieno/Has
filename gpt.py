@@ -1,4 +1,27 @@
-import pandas as pd
+import requests
+import json
+
+url = "https://api.openai-hk.com/v1/chat/completions"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "hk-g1m1nd1000045178a24f812b694d3915c4feb2607cbc0e85"
+}
+
+data = {
+    "max_tokens": 1200,
+    "model": "gpt-4",
+    "temperature": 0.8,
+    "top_p": 1,
+    "presence_penalty": 1,
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are ChatGPT, a large language model trained by OpenAI. Answer as concisely as possible."
+        },
+        {
+            "role": "user",
+            "content": """import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -6,15 +29,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import resample
 from sklearn.preprocessing import LabelEncoder
 from sklearn.impute import SimpleImputer  # 导入 SimpleImputer
 
 # 读取数据集 (假设数据集为csv格式)
 data = pd.read_csv('dataset/wines_SPA.csv')
+
+# 查看数据集基本信息
+print(data.head())
+print(data.info())
 
 # 列出所有非数值型特征
 non_numeric_cols = data.select_dtypes(include=['object']).columns
@@ -29,6 +53,8 @@ for col in non_numeric_cols:
 imputer = SimpleImputer(strategy='mean')  # 对于数值型数据，使用均值填充
 data_imputed = pd.DataFrame(imputer.fit_transform(data), columns=data.columns)
 
+# 查看数据填充后的前几行
+print(data_imputed.head())
 
 # 假设 'region' 是葡萄酒产区，'type' 是葡萄酒类型，其他列为特征
 X = data_imputed.drop(columns=['region', 'type'])
@@ -42,9 +68,8 @@ X_train_type, X_test_type, y_type_train, y_type_test = train_test_split(X, y_typ
 # 定义分类算法
 models = {
     'RandomForest': RandomForestClassifier(random_state=42),
-    'LogisticRegression': LogisticRegression(random_state=42),
-    'SVM': SVC(random_state=42),  # 支持向量机
-    'DecisionTree': DecisionTreeClassifier(random_state=42)  # 决策树
+    'LogisticRegression': LogisticRegression(max_iter=2000, solver='saga', random_state=42)
+
 }
 
 
@@ -82,7 +107,7 @@ def resample_data(X_train, y_train):
     # 过采样少数类
     minority_upsampled = resample(minority_class,
                                   replace=True,
-                                  n_samples=6 * majority_class.shape[0],
+                                  n_samples=majority_class.shape[0],
                                   random_state=42)
 
     # 合并重新构建数据集
@@ -92,14 +117,11 @@ def resample_data(X_train, y_train):
     return upsampled_data.drop(columns=[y_train.name]), upsampled_data[y_train.name]
 
 
-# 进行重采样
+# 对葡萄酒产区进行重采样
 X_train_resampled, y_train_resampled = resample_data(X_train, y_region_train)
-X_train_type_resampled, y_type_train_resampled = resample_data(X_train_type, y_type_train)
 
 # 重新评估重采样后的模型
 region_resampled_results = evaluate_model(X_train_resampled, X_test, y_train_resampled, y_region_test, models)
-type_resampled_results = evaluate_model(X_train_type_resampled, X_test_type, y_type_train_resampled, y_type_test,
-                                        models)
 
 # 输出重采样后结果
 print("Region Classification Accuracy (After Resampling):")
@@ -107,65 +129,27 @@ print(region_resampled_results)
 print("Type Classification Accuracy (After Resampling):")
 print(type_resampled_results)
 
-models_with_weights = {
-    'RandomForest': RandomForestClassifier(random_state=42, class_weight={0: 1, 1: 3}),
-    'LogisticRegression': LogisticRegression(random_state=42, class_weight={0: 1, 1: 3}),
-    'SVM': SVC(random_state=42, class_weight={0: 1, 1: 3}),  # 支持向量机
-    'DecisionTree': DecisionTreeClassifier(random_state=42, class_weight={0: 1, 1: 3})  # 决策树
-}
 
-
-# 重加权后的评估
-region_weighted_results = evaluate_model(X_train, X_test, y_region_train, y_region_test, models_with_weights)
-type_weighted_results = evaluate_model(X_train_type, X_test_type, y_type_train, y_type_test, models_with_weights)
-
-# 输出重加权后结果
-print("Region Classification Accuracy (After Class Weighting):")
-print(region_weighted_results)
-print("Type Classification Accuracy (After Class Weighting):")
-print(type_weighted_results)
-
-
-# 合并结果为一个 DataFrame，用于方便可视化
-def create_comparison_dataframe(region_results, region_resampled_results, region_weighted_results, type_results,
-                                type_resampled_results, type_weighted_results):
-    region_comparison = pd.DataFrame({
-        'Model': region_results.keys(),
-        'Original': region_results.values(),
-        'Resampled': region_resampled_results.values(),
-        'Weighted': region_weighted_results.values()
-    })
-
-    type_comparison = pd.DataFrame({
-        'Model': type_results.keys(),
-        'Original': type_results.values(),
-        'Resampled': type_resampled_results.values(),
-        'Weighted': type_weighted_results.values()
-    })
-
-    return region_comparison, type_comparison
-
-
-# 创建对比的 DataFrame
-region_comparison, type_comparison = create_comparison_dataframe(
-    region_results, region_resampled_results, region_weighted_results,
-    type_results, type_resampled_results, type_weighted_results
-)
-
-
-# 可视化区域分类结果
-def plot_comparison(df, title):
-    df.set_index('Model', inplace=True)
-    df.plot(kind='bar', figsize=(10, 6))
+# 可视化分类准确率
+def plot_accuracy(results, title):
+    plt.figure(figsize=(8, 6))
+    sns.barplot(x=list(results.keys()), y=list(results.values()))
     plt.title(title)
     plt.ylabel('Accuracy')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
     plt.show()
 
 
-# 绘制区域分类结果对比图
-plot_comparison(region_comparison, 'Region Classification Accuracy Comparison')
+# 可视化结果
+plot_accuracy(region_results, 'Original Region Classification Accuracy')
+plot_accuracy(region_resampled_results, 'Region Classification Accuracy after Resampling')
+plot_accuracy(type_results, 'Type Classification Accuracy') 在我这个代码基础上改SMOTE
+以及添加采样后的
+type_resampled_results"""
+        }
+    ]
+}
 
-# 绘制葡萄酒类型分类结果对比图
-plot_comparison(type_comparison, 'Wine Type Classification Accuracy Comparison')
+response = requests.post(url, headers=headers, data=json.dumps(data).encode('utf-8') )
+result = response.content.decode("utf-8")
+
+print(result)
