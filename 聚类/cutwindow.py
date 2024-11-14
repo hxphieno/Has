@@ -8,7 +8,6 @@ with open('dataset2/power.txt', 'r') as file:
 
 content = [i.split(",") for i in content.split("\n")]
 df = pd.DataFrame(content).apply(pd.to_numeric, errors='coerce')
-df=df[3000:10000]
 
 df = df.apply(lambda row:
               row.fillna(df.mean(axis=1, skipna=True)), axis=1)
@@ -18,7 +17,7 @@ df['var'] = df.drop("mean", axis=1).var(axis=1)
 
 X = df[['mean', 'var']]
 
-if (False):
+if (True):
     dbscan = DBSCAN(eps=5, min_samples=5)
     dbscan.fit(X)
     labels = dbscan.labels_
