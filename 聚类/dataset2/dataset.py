@@ -21,7 +21,7 @@ def sliding_window(data, sw_width=7, step=1):
         in_start += step
     return np.array(X)
 
-def dataset_power(path='./pv.csv',sw_width=7, step=1,attribute='power'):
+def dataset_power(path='./pv.csv',sw_width=7, step=3,attribute='power'):
     '''
     该函数实现功率 power/发电量generation滑动截取并保存到当前目录
     输入：path 文件路径
@@ -38,7 +38,7 @@ def dataset_power(path='./pv.csv',sw_width=7, step=1,attribute='power'):
         return
     x = sliding_window(data,sw_width,step)
     #写入对应文件
-    out = f'./{attribute}.txt'
+    out = f'./{attribute}-step{step}.txt'
     np.savetxt(out, x, fmt = '%s', delimiter = ',')
     return x
 
