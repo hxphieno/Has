@@ -23,7 +23,7 @@ def analyse_window_data(path, step=1):
 
     X = df[['mean', 'var']]
 
-    if (False):
+    if (True):
         dbscan = DBSCAN(eps=5, min_samples=5)
         dbscan.fit(X)
         labels = dbscan.labels_
